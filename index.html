@@ -128,6 +128,12 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
   <img src="frog_blue.png"><img src="frog_red.png">
   <img src="frog_blue_jump.png"><img src="frog_red_jump.png">
   <img src="lilypad.png"><img src="splash.png"><img src="water_bg.png">
+  <audio preload="auto" src="ribbit.mp3"></audio>
+  <audio preload="auto" src="splash.mp3"></audio>
+  <audio preload="auto" src="place.mp3"></audio>
+  <audio preload="auto" src="chain.mp3"></audio>
+  <audio preload="auto" src="win.mp3"></audio>
+  <audio preload="auto" src="lose.mp3"></audio>
 </div>
 
 <!-- START SCREEN -->
@@ -200,8 +206,31 @@ let stats = { moves: 0, bestChain: 0, captured: 0, winStreak: 0 };
 
 // ===== AUDIO =====
 let audioCtx;
+const sfx = {};
 function initAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Preload all sound effects
+  const files = ['ribbit', 'splash', 'place', 'chain', 'win', 'lose'];
+  files.forEach(name => {
+    fetch(name + '.mp3')
+      .then(r => r.arrayBuffer())
+      .then(buf => audioCtx.decodeAudioData(buf))
+      .then(decoded => { sfx[name] = decoded; })
+      .catch(() => {});
+  });
+}
+function playSfx(name, vol=0.5) {
+  if (!audioCtx || !sfx[name]) return;
+  try {
+    const src = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    src.buffer = sfx[name];
+    gain.gain.value = vol;
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start();
+  } catch(e) {}
 }
 function playTone(freq, dur, type='sine', vol=0.08) {
   if (!audioCtx) return;
@@ -213,20 +242,13 @@ function playTone(freq, dur, type='sine', vol=0.08) {
     o.start(); o.stop(audioCtx.currentTime + dur);
   } catch(e) {}
 }
-// Frog-themed sounds
-function sndPlace() { playTone(520, 0.06, 'sine', 0.06); playTone(680, 0.08, 'sine', 0.04); }
-function sndExplode(n) {
-  // Splash sound - noise burst
-  playTone(200 + n * 40, 0.15, 'sawtooth', 0.04);
-  setTimeout(() => playTone(150 + n * 30, 0.1, 'triangle', 0.05), 50);
-}
-function sndWin() { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.2, 'sine', 0.06), i*80)); }
-function sndLose() { [400,350,300,250].forEach((f,i) => setTimeout(() => playTone(f, 0.2, 'triangle', 0.05), i*100)); }
-// Ribbit!
-function sndRibbit() {
-  playTone(250, 0.08, 'square', 0.04);
-  setTimeout(() => playTone(350, 0.12, 'square', 0.05), 100);
-}
+// Sound functions — use real SFX with synth fallback
+function sndPlace() { playSfx('place', 0.4) || playTone(520, 0.06); }
+function sndExplode(n) { playSfx('splash', 0.3 + n * 0.05); }
+function sndRibbit() { playSfx('ribbit', 0.5); }
+function sndChain() { playSfx('chain', 0.5); }
+function sndWin() { playSfx('win', 0.6); }
+function sndLose() { playSfx('lose', 0.5); }
 
 // ===== BOARD LOGIC =====
 function critMass(r, c) {
@@ -515,7 +537,8 @@ async function animatedPlace(r, c, player) {
     if (!toExplode.length) break;
     chainLen++;
     sndExplode(chainLen);
-    if (chainLen <= 2) sndRibbit();
+    sndRibbit();
+    if (chainLen >= 3) sndChain();
 
     // Ripple + splash effects
     triggerRipples(toExplode, player);
