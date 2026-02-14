@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Frog Pond — Chain Reaction</title>
+<meta name="description" content="A pixel art strategy game. Place frogs on lily pads, trigger chain reactions, outsmart the AI!">
+<meta property="og:title" content="Frog Pond — Can You Beat the AI? 🐸⚡">
+<meta property="og:description" content="Place frogs, trigger chain reactions, dominate the pond!">
+<meta property="og:url" content="https://froogooofficial.github.io/frog-chain-reaction/">
+<meta property="og:type" content="website">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Press Start 2P',monospace;background:#0a1628;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none;image-rendering:pixelated}
+
+.container{width:100%;max-width:420px;padding:1rem;text-align:center}
+
+/* PIXEL ART BG PATTERN */
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:url('water_bg.png');background-size:128px 128px;opacity:0.15;z-index:0;pointer-events:none}
+.container{position:relative;z-index:1}
+
+/* START */
+#start-screen .logo{font-size:3rem;margin-bottom:0.5rem;filter:drop-shadow(0 0 10px rgba(34,197,94,0.4))}
+#start-screen h1{font-size:1.2rem;font-weight:900;color:#4ade80;margin-bottom:0.3rem;text-shadow:2px 2px 0 #166534}
+#start-screen .sub{color:#6b9080;font-size:0.55rem;margin-bottom:1.5rem;line-height:2}
+.rules-box{background:rgba(5,46,22,0.6);border:2px solid #166534;border-radius:4px;padding:1.2rem;margin-bottom:1.5rem;text-align:left;font-size:0.5rem;color:#86efac;line-height:2.5}
+.rules-box b{color:#fff}
+.btn-play{background:#166534;color:#4ade80;border:3px solid #4ade80;padding:0.8rem 2rem;font-size:0.8rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;transition:transform .2s;text-shadow:1px 1px 0 #052e16}
+.btn-play:active{transform:scale(.96)}
+.btn-play:hover{background:#4ade80;color:#052e16}
+
+/* GAME */
+#game-screen{display:none}
+.hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;padding:0 0.2rem}
+.hud-player{display:flex;align-items:center;gap:0.4rem;font-weight:700;font-size:0.55rem;padding:0.4rem 0.6rem;border-radius:4px;border:2px solid transparent;transition:all .3s}
+.hud-player.active{border-color:currentColor;box-shadow:0 0 10px currentColor}
+.hud-player.p1{color:#60a5fa}.hud-player.p2{color:#fb923c}
+.hud-center{font-size:0.5rem;color:#4a7c59}
+.orb-count{font-size:0.7rem}
+.hud-frog{width:20px;height:20px;image-rendering:pixelated}
+
+.grid-wrap{position:relative;margin:0 auto;border-radius:4px;overflow:visible;background:url('water_bg.png');background-size:64px 64px;border:2px solid #166534;box-shadow:0 0 30px rgba(34,197,94,0.1)}
+.grid{display:grid}
+.cell{position:relative;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;overflow:visible;border-radius:2px}
+.cell::before{content:'';position:absolute;top:8%;left:8%;width:84%;height:84%;background:url('lilypad.png') center/contain no-repeat;opacity:0.7;transition:opacity .2s;image-rendering:pixelated}
+.cell:hover::before{opacity:1}
+.cell.disabled{cursor:default;opacity:0.7}
+.cell.flash-p1{background:rgba(96,165,250,0.3)}
+.cell.flash-p2{background:rgba(251,146,62,0.3)}
+.cell.exploding{transform:scale(1.1);z-index:5}
+.cell.exploding::before{opacity:0.3}
+
+.frogs{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1px;position:relative;z-index:2}
+.frog{image-rendering:pixelated;transition:all .2s}
+.frog.p1{filter:drop-shadow(0 0 3px rgba(96,165,250,0.6))}
+.frog.p2{filter:drop-shadow(0 0 3px rgba(251,146,62,0.6))}
+
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.frog.critical{animation:hop .5s ease-in-out infinite}
+
+.chain-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-weight:900;pointer-events:none;opacity:0;z-index:50;text-shadow:2px 2px 0 #000}
+@keyframes chainPop{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{transform:translate(-50%,-70%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-100%) scale(1)}}
+.chain-popup.show{animation:chainPop .8s ease-out forwards}
+
+.flying-frog{position:absolute;z-index:10;pointer-events:none;transition:left .25s ease-out,top .25s ease-out;image-rendering:pixelated;filter:drop-shadow(0 0 4px rgba(255,255,255,0.5))}
+
+/* SPLASH EFFECT */
+.splash{position:absolute;z-index:15;pointer-events:none;image-rendering:pixelated;opacity:0}
+@keyframes splashAnim{0%{opacity:1;transform:translate(-50%,-50%) scale(0.3)}50%{opacity:0.8;transform:translate(-50%,-50%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
+.splash.show{animation:splashAnim .4s ease-out forwards}
+
+/* RIPPLE CANVAS */
+#ripple-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1}
+
+.turn-banner{font-size:0.55rem;color:#4a7c59;margin-top:0.8rem;min-height:1.5rem;font-weight:600}
+.turn-banner.thinking{color:#fb923c}
+
+@keyframes shakeGrid{0%,100%{transform:translate(0)}25%{transform:translate(-3px,2px)}50%{transform:translate(2px,-3px)}75%{transform:translate(-2px,1px)}}
+.grid-wrap.shake{animation:shakeGrid .25s ease-out}
+
+/* RESULT */
+#result-screen{display:none}
+.result-emoji{font-size:3rem;margin-bottom:0.5rem}
+.result-title{font-size:1rem;font-weight:900;margin-bottom:0.4rem;text-shadow:2px 2px 0 #000}
+.result-subtitle{color:#6b9080;font-size:0.5rem;margin-bottom:1.5rem;line-height:2}
+.result-stats{display:flex;justify-content:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.stat{text-align:center}
+.stat-val{font-size:0.8rem;font-weight:800}
+.stat-val.p1{color:#60a5fa}.stat-val.p2{color:#fb923c}
+.stat-lbl{font-size:0.4rem;color:#4a7c59;text-transform:uppercase;letter-spacing:1px;margin-top:0.2rem}
+.btn-share{width:100%;padding:0.7rem;font-size:0.55rem;font-weight:700;border:2px solid;border-radius:4px;cursor:pointer;font-family:inherit;margin-bottom:0.5rem;color:#fff;transition:transform .2s;display:flex;align-items:center;justify-content:center;gap:0.5rem}
+.btn-share:active{transform:scale(.97)}
+.btn-share.linkedin{background:#0077b5;border-color:#0077b5}
+.btn-share.twitter{background:#1a1a2e;border-color:#1da1f2;color:#1da1f2}
+.btn-share.whatsapp{background:#052e16;border-color:#25d366;color:#25d366}
+.btn-share.copy{background:#1a1a2e;border-color:#555;color:#aaa}
+.btn-replay{background:transparent;color:#4ade80;border:2px solid #166534;padding:0.6rem;font-size:0.55rem;font-weight:600;border-radius:4px;cursor:pointer;font-family:inherit;width:100%;margin-top:0.3rem}
+.btn-replay:hover{background:#166534}
+
+/* PRELOAD IMAGES */
+.preload{position:absolute;width:0;height:0;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- PRELOAD SPRITES -->
+<div class="preload">
+  <img src="frog_blue.png"><img src="frog_red.png">
+  <img src="frog_blue_jump.png"><img src="frog_red_jump.png">
+  <img src="lilypad.png"><img src="splash.png"><img src="water_bg.png">
+</div>
+
+<!-- START SCREEN -->
+<div id="start-screen">
+  <div class="logo">🐸</div>
+  <h1>FROG POND</h1>
+  <p class="sub">Outsmart the AI. Hop the chain. 🪷</p>
+  <div class="rules-box">
+    <b>🔵 You</b> vs <b style="color:#fb923c">🟠 AI</b><br>
+    Tap lily pads to place frogs.<br>
+    When a pad gets <b>too crowded</b>, frogs leap to neighbors!<br>
+    <b>Corners</b> = 2 · <b>Edges</b> = 3 · <b>Center</b> = 4<br>
+    Leaping frogs <b>convert</b> enemy frogs!<br>
+    <b>Clear all enemy frogs to win.</b>
+  </div>
+  <button class="btn-play" onclick="startGame()">START 🐸</button>
+  <p style="margin-top:1.5rem;font-size:0.4rem;color:#2d5a3d">Created by Dan Shamir & Arlo 🤖</p>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen">
+  <div class="hud">
+    <div class="hud-player p1" id="hud-p1">
+      <img src="frog_blue.png" class="hud-frog" alt=""> <span class="orb-count" id="count-p1">0</span>
+    </div>
+    <div class="hud-center" id="move-count">Move 1</div>
+    <div class="hud-player p2" id="hud-p2">
+      <span class="orb-count" id="count-p2">0</span> <img src="frog_red.png" class="hud-frog" alt="">
+    </div>
+  </div>
+  <div class="grid-wrap" id="grid-wrap">
+    <canvas id="ripple-canvas"></canvas>
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="turn-banner" id="turn-banner">Your turn</div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen">
+  <div class="result-emoji" id="r-emoji"></div>
+  <div class="result-title" id="r-title"></div>
+  <div class="result-subtitle" id="r-sub"></div>
+  <div class="result-stats">
+    <div class="stat"><div class="stat-val" id="r-moves">0</div><div class="stat-lbl">Moves</div></div>
+    <div class="stat"><div class="stat-val" id="r-chain">0</div><div class="stat-lbl">Best Chain</div></div>
+    <div class="stat"><div class="stat-val" id="r-captured">0</div><div class="stat-lbl">Captured</div></div>
+    <div class="stat"><div class="stat-val" id="r-streak">0</div><div class="stat-lbl">Win Streak</div></div>
+  </div>
+  <button class="btn-share linkedin" onclick="shareLinkedIn()">Share on LinkedIn</button>
+  <button class="btn-share twitter" onclick="shareTwitter()">Share on 𝕏</button>
+  <button class="btn-share whatsapp" onclick="shareWhatsApp()">Share on WhatsApp</button>
+  <button class="btn-share copy" onclick="copyResult()">📋 Copy Result</button>
+  <button class="btn-replay" onclick="startGame()">Play Again 🐸</button>
+  <p style="margin-top:1rem;font-size:0.4rem;color:#2d5a3d">Created by Dan Shamir & Arlo 🤖</p>
+</div>
+
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const ROWS = 9, COLS = 6;
+let CELL_SIZE = 50, GAP = 2;
+const ANIM_DELAY = 250;
+const FROG_SPRITES = { 1: 'frog_blue.png', 2: 'frog_red.png' };
+const FROG_JUMP = { 1: 'frog_blue_jump.png', 2: 'frog_red_jump.png' };
+
+// ===== STATE =====
+let board, currentPlayer, totalMoves, animating, gameOver;
+let stats = { moves: 0, bestChain: 0, captured: 0, winStreak: 0 };
+
+// ===== AUDIO =====
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playTone(freq, dur, type='sine', vol=0.08) {
+  if (!audioCtx) return;
+  try {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol; g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+// Frog-themed sounds
+function sndPlace() { playTone(520, 0.06, 'sine', 0.06); playTone(680, 0.08, 'sine', 0.04); }
+function sndExplode(n) {
+  // Splash sound - noise burst
+  playTone(200 + n * 40, 0.15, 'sawtooth', 0.04);
+  setTimeout(() => playTone(150 + n * 30, 0.1, 'triangle', 0.05), 50);
+}
+function sndWin() { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.2, 'sine', 0.06), i*80)); }
+function sndLose() { [400,350,300,250].forEach((f,i) => setTimeout(() => playTone(f, 0.2, 'triangle', 0.05), i*100)); }
+// Ribbit!
+function sndRibbit() {
+  playTone(250, 0.08, 'square', 0.04);
+  setTimeout(() => playTone(350, 0.12, 'square', 0.05), 100);
+}
+
+// ===== BOARD LOGIC =====
+function critMass(r, c) {
+  let n = 4;
+  if (r === 0 || r === ROWS-1) n--;
+  if (c === 0 || c === COLS-1) n--;
+  return n;
+}
+function neighbors(r, c) {
+  const ns = [];
+  if (r > 0) ns.push([r-1,c]);
+  if (r < ROWS-1) ns.push([r+1,c]);
+  if (c > 0) ns.push([r,c-1]);
+  if (c < COLS-1) ns.push([r,c+1]);
+  return ns;
+}
+function countOrbs(b, player) {
+  let n = 0;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (b[r][c].owner === player) n += b[r][c].count;
+  return n;
+}
+function deepCopy(b) { return b.map(row => row.map(cell => ({...cell}))); }
+function isGameOver(b) {
+  if (totalMoves < 2) return 0;
+  const p1 = countOrbs(b, 1), p2 = countOrbs(b, 2);
+  if (p1 === 0) return 2;
+  if (p2 === 0) return 1;
+  return 0;
+}
+
+// Pure simulation
+function simulate(b, r, c, player) {
+  b[r][c].count++; b[r][c].owner = player;
+  let chainLen = 0, captured = 0, iters = 0;
+  while (iters++ < 200) {
+    const toExplode = [];
+    for (let rr = 0; rr < ROWS; rr++)
+      for (let cc = 0; cc < COLS; cc++)
+        if (b[rr][cc].count >= critMass(rr, cc)) toExplode.push([rr,cc]);
+    if (!toExplode.length) break;
+    chainLen++;
+    for (const [er, ec] of toExplode) {
+      b[er][ec].count -= critMass(er, ec);
+      if (b[er][ec].count <= 0) { b[er][ec].count = 0; b[er][ec].owner = 0; }
+      for (const [nr, nc] of neighbors(er, ec)) {
+        if (b[nr][nc].owner !== 0 && b[nr][nc].owner !== player) captured++;
+        b[nr][nc].count++; b[nr][nc].owner = player;
+      }
+    }
+    let p1 = false, p2 = false;
+    for (let rr = 0; rr < ROWS; rr++)
+      for (let cc = 0; cc < COLS; cc++) {
+        if (b[rr][cc].owner === 1) p1 = true;
+        if (b[rr][cc].owner === 2) p2 = true;
+      }
+    if (totalMoves >= 1 && (!p1 || !p2)) break;
+  }
+  return { board: b, chainLen, captured };
+}
+
+// ===== AI =====
+function aiMove() {
+  const valid = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (board[r][c].owner === 0 || board[r][c].owner === 2) valid.push([r, c]);
+
+  let bestScore = -Infinity, bestMoves = [];
+  for (const [r, c] of valid) {
+    const sim = deepCopy(board);
+    const result = simulate(sim, r, c, 2);
+    let score = 0;
+    const myOrbs = countOrbs(result.board, 2);
+    const theirOrbs = countOrbs(result.board, 1);
+    if (totalMoves >= 1 && theirOrbs === 0) return [r, c];
+    score += myOrbs * 2 - theirOrbs * 2;
+    let myCells = 0, theirCells = 0;
+    for (let rr = 0; rr < ROWS; rr++)
+      for (let cc = 0; cc < COLS; cc++) {
+        if (result.board[rr][cc].owner === 2) myCells++;
+        if (result.board[rr][cc].owner === 1) theirCells++;
+      }
+    score += (myCells - theirCells) * 3;
+    score += result.captured * 5;
+    const cm = critMass(r, c);
+    if (cm === 2) score += 4;
+    else if (cm === 3) score += 1;
+    if (result.chainLen === 0) {
+      for (const [nr, nc] of neighbors(r, c)) {
+        if (board[nr][nc].owner === 1 && board[nr][nc].count === critMass(nr, nc) - 1) score -= 12;
+      }
+    }
+    if (board[r][c].owner === 2 && board[r][c].count === critMass(r, c) - 1) {
+      score += result.captured > 0 ? 10 : -3;
+    }
+    if (score > bestScore) { bestScore = score; bestMoves = [[r, c]]; }
+    else if (score === bestScore) bestMoves.push([r, c]);
+  }
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+}
+
+// ===== RENDERING =====
+const $ = id => document.getElementById(id);
+const gridEl = $('grid');
+const gridWrap = $('grid-wrap');
+
+function initGrid() {
+  const maxW = Math.min(420, window.innerWidth - 32);
+  CELL_SIZE = Math.floor((maxW - GAP * (COLS - 1)) / COLS);
+  const gridW = CELL_SIZE * COLS + GAP * (COLS - 1);
+  const gridH = CELL_SIZE * ROWS + GAP * (ROWS - 1);
+
+  gridEl.style.gridTemplateColumns = `repeat(${COLS}, ${CELL_SIZE}px)`;
+  gridEl.style.gridTemplateRows = `repeat(${ROWS}, ${CELL_SIZE}px)`;
+  gridEl.style.gap = GAP + 'px';
+  gridWrap.style.width = gridW + 'px';
+  gridWrap.style.height = gridH + 'px';
+
+  gridEl.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.addEventListener('click', () => onCellClick(r, c));
+      const frogsDiv = document.createElement('div');
+      frogsDiv.className = 'frogs';
+      cell.appendChild(frogsDiv);
+      gridEl.appendChild(cell);
+    }
+  }
+
+  // Resize ripple canvas
+  const rc = $('ripple-canvas');
+  rc.width = gridW; rc.height = gridH;
+}
+
+function cellEl(r, c) { return gridEl.children[r * COLS + c]; }
+
+function cellCenter(r, c) {
+  return {
+    x: c * (CELL_SIZE + GAP) + CELL_SIZE / 2,
+    y: r * (CELL_SIZE + GAP) + CELL_SIZE / 2
+  };
+}
+
+function getFrogSize(count) {
+  // Scale frogs based on how many in cell
+  if (count <= 1) return Math.floor(CELL_SIZE * 0.6);
+  if (count === 2) return Math.floor(CELL_SIZE * 0.42);
+  return Math.floor(CELL_SIZE * 0.34);
+}
+
+function renderBoard() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = cellEl(r, c);
+      const frogsDiv = cell.querySelector('.frogs');
+      const { count, owner } = board[r][c];
+      const isCrit = count === critMass(r, c) - 1 && owner !== 0;
+      const sz = getFrogSize(count);
+
+      frogsDiv.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const frog = document.createElement('img');
+        frog.src = FROG_SPRITES[owner];
+        frog.className = `frog p${owner}${isCrit ? ' critical' : ''}`;
+        frog.style.width = sz + 'px';
+        frog.style.height = sz + 'px';
+        frog.draggable = false;
+        frogsDiv.appendChild(frog);
+      }
+    }
+  }
+  $('count-p1').textContent = countOrbs(board, 1);
+  $('count-p2').textContent = countOrbs(board, 2);
+  $('hud-p1').classList.toggle('active', currentPlayer === 1 && !gameOver);
+  $('hud-p2').classList.toggle('active', currentPlayer === 2 && !gameOver);
+}
+
+// ===== RIPPLE EFFECTS =====
+const rippleCanvas = $('ripple-canvas');
+const rCtx = rippleCanvas ? rippleCanvas.getContext('2d') : null;
+let ripples = [];
+
+function spawnRipple(x, y, color) {
+  ripples.push({ x, y, r: 5, maxR: 25 + Math.random() * 15, color, alpha: 0.6 });
+}
+
+let rippleAnimating = false;
+function animateRipples() {
+  if (!rCtx) return;
+  rCtx.clearRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+  ripples = ripples.filter(r => r.alpha > 0);
+  for (const rp of ripples) {
+    rCtx.beginPath();
+    rCtx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+    rCtx.strokeStyle = rp.color;
+    rCtx.lineWidth = 2;
+    rCtx.globalAlpha = rp.alpha;
+    rCtx.stroke();
+    rp.r += 1.2;
+    rp.alpha -= 0.02;
+  }
+  rCtx.globalAlpha = 1;
+  if (ripples.length > 0) {
+    requestAnimationFrame(animateRipples);
+  } else {
+    rippleAnimating = false;
+    rCtx.clearRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+  }
+}
+
+function triggerRipples(cells, player) {
+  const color = player === 1 ? 'rgba(96,165,250,0.8)' : 'rgba(251,146,62,0.8)';
+  for (const [r, c] of cells) {
+    const ctr = cellCenter(r, c);
+    spawnRipple(ctr.x, ctr.y, color);
+    // Extra ripples to neighbors
+    for (const [nr, nc] of neighbors(r, c)) {
+      const to = cellCenter(nr, nc);
+      setTimeout(() => spawnRipple(to.x, to.y, color), 100 + Math.random() * 100);
+    }
+  }
+  if (!rippleAnimating) {
+    rippleAnimating = true;
+    animateRipples();
+  }
+}
+
+// ===== SPLASH EFFECT =====
+function showSplash(r, c) {
+  const ctr = cellCenter(r, c);
+  const splash = document.createElement('img');
+  splash.src = 'splash.png';
+  splash.className = 'splash';
+  splash.style.width = (CELL_SIZE * 1.2) + 'px';
+  splash.style.height = (CELL_SIZE * 1.2) + 'px';
+  splash.style.left = ctr.x + 'px';
+  splash.style.top = ctr.y + 'px';
+  gridWrap.appendChild(splash);
+  requestAnimationFrame(() => splash.classList.add('show'));
+  setTimeout(() => splash.remove(), 450);
+}
+
+// ===== ANIMATED EXPLOSIONS =====
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function animatedPlace(r, c, player) {
+  board[r][c].count++;
+  board[r][c].owner = player;
+  renderBoard();
+  sndPlace();
+
+  let chainLen = 0, totalCaptured = 0, iters = 0;
+
+  while (iters++ < 200) {
+    const toExplode = [];
+    for (let rr = 0; rr < ROWS; rr++)
+      for (let cc = 0; cc < COLS; cc++)
+        if (board[rr][cc].count >= critMass(rr, cc)) toExplode.push([rr, cc]);
+    if (!toExplode.length) break;
+    chainLen++;
+    sndExplode(chainLen);
+    if (chainLen <= 2) sndRibbit();
+
+    // Ripple + splash effects
+    triggerRipples(toExplode, player);
+    for (const [er, ec] of toExplode) showSplash(er, ec);
+
+    // Create flying frogs
+    const flyingFrogs = [];
+    const frogSize = Math.floor(CELL_SIZE * 0.4);
+    for (const [er, ec] of toExplode) {
+      const from = cellCenter(er, ec);
+      cellEl(er, ec).classList.add('exploding');
+
+      board[er][ec].count -= critMass(er, ec);
+      if (board[er][ec].count <= 0) { board[er][ec].count = 0; board[er][ec].owner = 0; }
+
+      for (const [nr, nc] of neighbors(er, ec)) {
+        if (board[nr][nc].owner !== 0 && board[nr][nc].owner !== player) totalCaptured++;
+        const to = cellCenter(nr, nc);
+        const frog = document.createElement('img');
+        frog.src = FROG_JUMP[player];
+        frog.className = `flying-frog`;
+        frog.style.width = frogSize + 'px';
+        frog.style.height = frogSize + 'px';
+        frog.style.left = (from.x - frogSize/2) + 'px';
+        frog.style.top = (from.y - frogSize/2) + 'px';
+        gridWrap.appendChild(frog);
+        flyingFrogs.push(frog);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          frog.style.left = (to.x - frogSize/2) + 'px';
+          frog.style.top = (to.y - frogSize/2) + 'px';
+        }));
+      }
+    }
+
+    renderBoard();
+    await delay(ANIM_DELAY);
+
+    // Apply to neighbors
+    for (const [er, ec] of toExplode) {
+      cellEl(er, ec).classList.remove('exploding');
+      for (const [nr, nc] of neighbors(er, ec)) {
+        board[nr][nc].count++;
+        board[nr][nc].owner = player;
+        cellEl(nr, nc).classList.add(`flash-p${player}`);
+        // Splash on landing
+        showSplash(nr, nc);
+      }
+    }
+    renderBoard();
+    flyingFrogs.forEach(f => f.remove());
+
+    if (chainLen >= 2) showChainPopup(chainLen, toExplode[0]);
+    if (chainLen >= 3) gridWrap.classList.add('shake');
+
+    await delay(80);
+    for (const [er, ec] of toExplode)
+      for (const [nr, nc] of neighbors(er, ec))
+        cellEl(nr, nc).classList.remove('flash-p1', 'flash-p2');
+    gridWrap.classList.remove('shake');
+
+    const winner = isGameOver(board);
+    if (winner) { endGame(winner); return { chainLen, captured: totalCaptured }; }
+  }
+
+  if (chainLen > stats.bestChain) stats.bestChain = chainLen;
+  stats.captured += totalCaptured;
+  return { chainLen, captured: totalCaptured };
+}
+
+function showChainPopup(n, srcCell) {
+  const popup = document.createElement('div');
+  popup.className = 'chain-popup';
+  popup.style.color = n >= 5 ? '#4ade80' : (currentPlayer === 1 ? '#60a5fa' : '#fb923c');
+  popup.textContent = n >= 5 ? `🐸 ${n}x CHAIN!` : `💦 ${n}x`;
+  popup.style.left = '50%'; popup.style.top = '50%';
+  gridWrap.appendChild(popup);
+  requestAnimationFrame(() => popup.classList.add('show'));
+  setTimeout(() => popup.remove(), 900);
+}
+
+// ===== GAME FLOW =====
+function startGame() {
+  initAudio();
+  board = [];
+  for (let r = 0; r < ROWS; r++) {
+    board[r] = [];
+    for (let c = 0; c < COLS; c++) board[r][c] = { count: 0, owner: 0 };
+  }
+  currentPlayer = 1; totalMoves = 0;
+  animating = false; gameOver = false;
+  stats.moves = 0; stats.bestChain = 0; stats.captured = 0;
+
+  $('start-screen').style.display = 'none';
+  $('result-screen').style.display = 'none';
+  $('game-screen').style.display = 'block';
+
+  initGrid();
+  renderBoard();
+  updateTurnBanner();
+}
+
+function updateTurnBanner() {
+  const banner = $('turn-banner');
+  if (currentPlayer === 1) {
+    banner.textContent = 'Your turn — tap a lily pad';
+    banner.className = 'turn-banner';
+  } else {
+    banner.textContent = 'AI is thinking...';
+    banner.className = 'turn-banner thinking';
+  }
+}
+
+async function onCellClick(r, c) {
+  if (animating || gameOver || currentPlayer !== 1) return;
+  if (board[r][c].owner !== 0 && board[r][c].owner !== 1) return;
+
+  animating = true;
+  totalMoves++; stats.moves++;
+  $('move-count').textContent = `Move ${stats.moves}`;
+
+  await animatedPlace(r, c, 1);
+  if (gameOver) return;
+
+  currentPlayer = 2;
+  updateTurnBanner();
+  await delay(400 + Math.random() * 300);
+  if (gameOver) return;
+
+  const [ar, ac] = aiMove();
+  totalMoves++;
+  await animatedPlace(ar, ac, 2);
+  if (gameOver) return;
+
+  currentPlayer = 1;
+  animating = false;
+  updateTurnBanner();
+}
+
+function endGame(winner) {
+  gameOver = true; animating = false;
+  if (winner === 1) { stats.winStreak++; sndWin(); }
+  else { stats.winStreak = 0; sndLose(); }
+
+  setTimeout(() => {
+    $('game-screen').style.display = 'none';
+    $('result-screen').style.display = 'block';
+
+    if (winner === 1) {
+      $('r-emoji').textContent = '🏆';
+      $('r-title').textContent = 'YOU WON!';
+      $('r-title').style.color = '#4ade80';
+      $('r-sub').textContent = 'The AI frogs have fled the pond!';
+    } else {
+      $('r-emoji').textContent = '💀';
+      $('r-title').textContent = 'AI WINS';
+      $('r-title').style.color = '#fb923c';
+      $('r-sub').textContent = 'The AI frogs dominated the pond...';
+    }
+
+    $('r-moves').textContent = stats.moves;
+    $('r-moves').className = `stat-val p${winner}`;
+    $('r-chain').textContent = stats.bestChain;
+    $('r-captured').textContent = stats.captured;
+    $('r-streak').textContent = stats.winStreak;
+  }, 600);
+}
+
+// ===== SHARING =====
+function getShareText() {
+  const won = stats.winStreak > 0;
+  return [
+    won ? `🏆🐸 I beat the AI in Frog Pond in ${stats.moves} moves!` : `💀🐸 The AI crushed me in Frog Pond after ${stats.moves} moves!`,
+    '', `📊 My score:`, `💦 Longest chain: ${stats.bestChain}x`, `🐸 Frogs captured: ${stats.captured}`,
+    stats.winStreak > 1 ? `🔥 Win streak: ${stats.winStreak}` : '',
+    '', won ? `Think you can beat my ${stats.moves}-move win? 👀` : `Can you beat it? 🤔`,
+    `🎮 ${window.location.href}`
+  ].filter(l => l !== undefined && l !== '').join('\n');
+}
+function shareLinkedIn() {
+  const url = encodeURIComponent(window.location.href);
+  window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank');
+}
+function shareTwitter() {
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`, '_blank');
+}
+function shareWhatsApp() {
+  window.open(`https://wa.me/?text=${encodeURIComponent(getShareText())}`, '_blank');
+}
+function copyResult() {
+  navigator.clipboard.writeText(getShareText()).then(() => {
+    const btn = document.querySelector('.copy');
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy Result', 2000);
+  });
+}
+</script>
+</body>
+</html>
