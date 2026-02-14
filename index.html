@@ -22,18 +22,49 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .container{position:relative;z-index:1}
 
 /* START */
-#start-screen .logo{margin-bottom:0.5rem;filter:drop-shadow(0 0 10px rgba(34,197,94,0.4))}
-#start-screen .logo img{width:min(280px, 70vw);image-rendering:pixelated;border-radius:8px}
+#start-screen{position:relative;overflow:hidden;min-height:90vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#start-screen .logo{margin-bottom:0.8rem;filter:drop-shadow(0 0 20px rgba(34,197,94,0.5)) drop-shadow(0 0 40px rgba(34,197,94,0.2));animation:logoFloat 3s ease-in-out infinite}
+#start-screen .logo img{width:min(300px, 75vw);image-rendering:pixelated;border-radius:8px;border:3px solid rgba(74,222,128,0.3)}
+@keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 #start-screen h1{display:none}
-#start-screen .sub{color:#6b9080;font-size:0.55rem;margin-bottom:1.5rem;line-height:2}
-.rules-box{background:rgba(5,46,22,0.6);border:2px solid #166534;border-radius:4px;padding:1.2rem;margin-bottom:1.5rem;text-align:left;font-size:0.5rem;color:#86efac;line-height:2.5}
+#start-screen .sub{color:#6b9080;font-size:0.5rem;margin-bottom:1.2rem;line-height:2.2}
+.rules-box{background:rgba(5,46,22,0.7);border:2px solid #166534;border-radius:6px;padding:1rem 1.2rem;margin-bottom:1.2rem;text-align:left;font-size:0.45rem;color:#86efac;line-height:2.6;backdrop-filter:blur(4px);max-width:340px;width:100%}
 .rules-box b{color:#fff}
-.btn-play{background:#166534;color:#4ade80;border:3px solid #4ade80;padding:0.8rem 2rem;font-size:0.8rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;transition:transform .2s;text-shadow:1px 1px 0 #052e16}
+.rules-box .rule-icon{display:inline-block;width:1.2em;text-align:center}
+.btn-play{background:linear-gradient(180deg,#1a8a45,#166534);color:#4ade80;border:3px solid #4ade80;padding:0.9rem 2.5rem;font-size:0.8rem;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;transition:all .2s;text-shadow:1px 1px 0 #052e16;box-shadow:0 0 20px rgba(74,222,128,0.3),inset 0 1px 0 rgba(255,255,255,0.1);position:relative;z-index:2}
 .btn-play:active{transform:scale(.96)}
-.btn-play:hover{background:#4ade80;color:#052e16}
+.btn-play:hover{background:linear-gradient(180deg,#4ade80,#22c55e);color:#052e16;box-shadow:0 0 30px rgba(74,222,128,0.5)}
 .diff-select{display:flex;gap:0.5rem;justify-content:center;margin-bottom:1.2rem}
 .diff-btn{background:rgba(5,46,22,0.6);border:2px solid #166534;color:#86efac;padding:0.5rem 1rem;font-size:0.5rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;transition:all .2s}
 .diff-btn.active{background:#166534;border-color:#4ade80;color:#4ade80;box-shadow:0 0 12px rgba(74,222,128,0.3)}
+
+/* FLOATING FROGS BACKGROUND */
+.bg-frogs{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden}
+.bg-frog{position:absolute;image-rendering:pixelated;opacity:0.15;animation:frogFloat linear infinite}
+@keyframes frogFloat{
+  0%{transform:translateY(0) rotate(0deg) scale(1)}
+  25%{transform:translateY(-30px) rotate(5deg) scale(1.05)}
+  50%{transform:translateY(-10px) rotate(-3deg) scale(1)}
+  75%{transform:translateY(-25px) rotate(4deg) scale(1.03)}
+  100%{transform:translateY(0) rotate(0deg) scale(1)}
+}
+@keyframes frogDrift{
+  0%{transform:translate(0,0)}
+  100%{transform:translate(var(--dx), var(--dy))}
+}
+.bg-lilypad{position:absolute;image-rendering:pixelated;opacity:0.08;animation:padDrift linear infinite}
+@keyframes padDrift{
+  0%{transform:translateY(0) rotate(0deg)}
+  50%{transform:translateY(-8px) rotate(10deg)}
+  100%{transform:translateY(0) rotate(0deg)}
+}
+
+/* FIREFLIES */
+.firefly{position:absolute;width:4px;height:4px;border-radius:50%;background:#4ade80;pointer-events:none;animation:fireflyGlow ease-in-out infinite}
+@keyframes fireflyGlow{
+  0%,100%{opacity:0;transform:scale(0.5)}
+  50%{opacity:0.8;transform:scale(1.5)}
+}
 
 /* GAME */
 #game-screen{display:none;position:relative}
@@ -98,7 +129,6 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 
 .turn-banner{font-size:0.55rem;color:#4a7c59;margin-top:0.8rem;min-height:1.5rem;font-weight:600}
 .turn-banner.thinking{color:#fb923c}
-.mute-btn{position:absolute;top:0.5rem;left:0.5rem;background:rgba(5,46,22,0.7);border:2px solid #166534;color:#fff;font-size:1.2rem;width:2.2rem;height:2.2rem;border-radius:50%;cursor:pointer;z-index:10;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
 
 @keyframes shakeGrid{0%,100%{transform:translate(0)}25%{transform:translate(-3px,2px)}50%{transform:translate(2px,-3px)}75%{transform:translate(-2px,1px)}}
 .grid-wrap.shake{animation:shakeGrid .25s ease-out}
@@ -143,25 +173,28 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
   <audio preload="auto" src="music.mp3"></audio>
 </div>
 
+<!-- BACKGROUND FROGS (animated) -->
+<div class="bg-frogs" id="bg-frogs"></div>
+
 <!-- START SCREEN -->
 <div id="start-screen">
   <div class="logo"><img src="og-image-v2.png" alt="Frog Pond"></div>
   <h1>FROG POND</h1>
-  <p class="sub">Outsmart the AI. Hop the chain. 🪷</p>
+  <p class="sub">Outsmart the AI. Dominate the pond. 🪷</p>
   <div class="rules-box">
-    <b>🔵 You</b> vs <b style="color:#fb923c">🟠 AI</b><br>
-    Tap lily pads to place frogs.<br>
-    When a pad gets <b>too crowded</b>, frogs leap to neighbors!<br>
-    <b>Corners</b> = 2 · <b>Edges</b> = 3 · <b>Center</b> = 4<br>
-    Leaping frogs <b>convert</b> enemy frogs!<br>
-    <b>Clear all enemy frogs to win.</b>
+    <span class="rule-icon">🔵</span> <b>You</b> vs <b style="color:#fb923c">🟠 AI</b><br>
+    <span class="rule-icon">👆</span> Tap lily pads to place frogs<br>
+    <span class="rule-icon">💥</span> Too many frogs? They <b>explode</b> outward!<br>
+    <span class="rule-icon">📐</span> <b>Corners</b>=2 · <b>Edges</b>=3 · <b>Center</b>=4<br>
+    <span class="rule-icon">🔄</span> Leaping frogs <b>convert</b> enemies!<br>
+    <span class="rule-icon">🏆</span> <b>Clear all enemy frogs to win</b>
   </div>
   <div class="diff-select">
     <button class="diff-btn" data-d="easy" onclick="setDiff('easy')">🌱 Easy</button>
     <button class="diff-btn active" data-d="hard" onclick="setDiff('hard')">🧠 Hard</button>
   </div>
   <button class="btn-play" onclick="startGame()">START 🐸</button>
-  <p style="margin-top:1.5rem;font-size:0.4rem;color:#2d5a3d">Created by Dan Shamir & Arlo 🤖</p>
+  <p style="margin-top:1.5rem;font-size:0.35rem;color:#2d5a3d">Created by Dan Shamir & Arlo 🤖</p>
 </div>
 
 <!-- GAME SCREEN -->
@@ -180,7 +213,6 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
     <div class="grid" id="grid"></div>
   </div>
   <div class="turn-banner" id="turn-banner">Your turn</div>
-  <button class="mute-btn" id="mute-btn" onclick="toggleMusic()">🎵</button>
 </div>
 
 <!-- RESULT SCREEN -->
@@ -242,23 +274,7 @@ function initAudio() {
   }
   // Restore mute preference
   musicMuted = localStorage.getItem('frogMusicMuted') === '1';
-  updateMuteBtn();
   if (!musicMuted) musicEl.play().catch(() => {});
-}
-
-function toggleMusic() {
-  musicMuted = !musicMuted;
-  localStorage.setItem('frogMusicMuted', musicMuted ? '1' : '0');
-  if (musicEl) {
-    if (musicMuted) musicEl.pause();
-    else musicEl.play().catch(() => {});
-  }
-  updateMuteBtn();
-}
-
-function updateMuteBtn() {
-  const btn = $('mute-btn');
-  if (btn) btn.textContent = musicMuted ? '🔇' : '🎵';
 }
 
 function playSfx(name, vol=0.5) {
@@ -874,6 +890,61 @@ function copyResult() {
     setTimeout(() => btn.textContent = '📋 Copy Result', 2000);
   });
 }
+
+// ===== ANIMATED BACKGROUND =====
+function spawnBgFrogs() {
+  const container = document.getElementById('bg-frogs');
+  if (!container) return;
+  const sprites = ['frog_blue.png', 'frog_red.png', 'frog_blue_jump.png', 'frog_red_jump.png'];
+  
+  // Spawn floating frogs
+  for (let i = 0; i < 12; i++) {
+    const img = document.createElement('img');
+    img.src = sprites[Math.floor(Math.random() * sprites.length)];
+    img.className = 'bg-frog';
+    const size = 16 + Math.random() * 28;
+    img.style.width = size + 'px';
+    img.style.height = size + 'px';
+    img.style.left = (Math.random() * 100) + '%';
+    img.style.top = (Math.random() * 100) + '%';
+    img.style.animationDuration = (3 + Math.random() * 4) + 's';
+    img.style.animationDelay = (Math.random() * 5) + 's';
+    img.style.opacity = 0.06 + Math.random() * 0.12;
+    container.appendChild(img);
+  }
+  
+  // Spawn lily pads
+  for (let i = 0; i < 6; i++) {
+    const img = document.createElement('img');
+    img.src = 'lilypad.png';
+    img.className = 'bg-lilypad';
+    const size = 20 + Math.random() * 30;
+    img.style.width = size + 'px';
+    img.style.height = size + 'px';
+    img.style.left = (Math.random() * 100) + '%';
+    img.style.top = (Math.random() * 100) + '%';
+    img.style.animationDuration = (4 + Math.random() * 6) + 's';
+    img.style.animationDelay = (Math.random() * 4) + 's';
+    container.appendChild(img);
+  }
+  
+  // Spawn fireflies
+  for (let i = 0; i < 15; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'firefly';
+    dot.style.left = (Math.random() * 100) + '%';
+    dot.style.top = (Math.random() * 100) + '%';
+    dot.style.animationDuration = (2 + Math.random() * 4) + 's';
+    dot.style.animationDelay = (Math.random() * 5) + 's';
+    const hue = Math.random() > 0.3 ? '142' : '200'; // green or blue
+    dot.style.background = `hsl(${hue}, 80%, 65%)`;
+    dot.style.boxShadow = `0 0 6px hsl(${hue}, 80%, 65%)`;
+    container.appendChild(dot);
+  }
+}
+
+// Init background on load
+spawnBgFrogs();
 </script>
 </body>
 </html>
