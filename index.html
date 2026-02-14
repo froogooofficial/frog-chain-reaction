@@ -52,12 +52,28 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .cell.exploding::before{opacity:0.3}
 
 .frogs{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:1px;position:relative;z-index:2}
-.frog{image-rendering:pixelated;transition:all .2s}
-.frog.p1{filter:drop-shadow(0 0 3px rgba(96,165,250,0.6))}
-.frog.p2{filter:drop-shadow(0 0 3px rgba(251,146,62,0.6))}
+.frog-wrap{position:relative;display:inline-block}
+.frog-wrap .sit,.frog-wrap .jump{image-rendering:pixelated;position:absolute;top:0;left:0;width:100%;height:100%;transition:opacity .1s}
+.frog-wrap .sit{position:relative;opacity:1}
+.frog-wrap .jump{opacity:0}
+.frog-wrap.p1 .sit,.frog-wrap.p1 .jump{filter:drop-shadow(0 0 3px rgba(96,165,250,0.6))}
+.frog-wrap.p2 .sit,.frog-wrap.p2 .jump{filter:drop-shadow(0 0 3px rgba(251,146,62,0.6))}
 
-@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.frog.critical{animation:hop .5s ease-in-out infinite}
+/* Idle hop — swap sprites + bounce */
+@keyframes idleHop{0%,100%{transform:translateY(0)}35%,65%{transform:translateY(-5px)}}
+.frog-wrap.critical{animation:idleHop .6s ease-in-out infinite}
+.frog-wrap.critical .sit{animation:spriteSwap .6s ease-in-out infinite}
+.frog-wrap.critical .jump{animation:spriteSwapInv .6s ease-in-out infinite}
+@keyframes spriteSwap{0%,30%{opacity:1}35%,65%{opacity:0}70%,100%{opacity:1}}
+@keyframes spriteSwapInv{0%,30%{opacity:0}35%,65%{opacity:1}70%,100%{opacity:0}}
+
+/* Place bounce — one-shot */
+@keyframes placeHop{0%{transform:translateY(0) scale(1)}20%{transform:translateY(-8px) scale(1.1)}50%{transform:translateY(-10px) scale(1.05)}80%{transform:translateY(-2px) scale(1)}100%{transform:translateY(0) scale(1)}}
+.frog-wrap.placed{animation:placeHop .35s ease-out}
+.frog-wrap.placed .sit{animation:placeSpriteSwap .35s ease-out}
+.frog-wrap.placed .jump{animation:placeSpriteSwapInv .35s ease-out}
+@keyframes placeSpriteSwap{0%,15%{opacity:1}20%,70%{opacity:0}75%,100%{opacity:1}}
+@keyframes placeSpriteSwapInv{0%,15%{opacity:0}20%,70%{opacity:1}75%,100%{opacity:0}}
 
 .chain-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-weight:900;pointer-events:none;opacity:0;z-index:50;text-shadow:2px 2px 0 #000}
 @keyframes chainPop{0%{opacity:1;transform:translate(-50%,-50%) scale(0.5)}50%{transform:translate(-50%,-70%) scale(1.2)}100%{opacity:0;transform:translate(-50%,-100%) scale(1)}}
@@ -356,11 +372,13 @@ function cellCenter(r, c) {
 }
 
 function getFrogSize(count) {
-  // Scale frogs based on how many in cell
   if (count <= 1) return Math.floor(CELL_SIZE * 0.6);
   if (count === 2) return Math.floor(CELL_SIZE * 0.42);
   return Math.floor(CELL_SIZE * 0.34);
 }
+
+// Track which cell just got placed for one-shot animation
+let justPlaced = null;
 
 function renderBoard() {
   for (let r = 0; r < ROWS; r++) {
@@ -370,19 +388,40 @@ function renderBoard() {
       const { count, owner } = board[r][c];
       const isCrit = count === critMass(r, c) - 1 && owner !== 0;
       const sz = getFrogSize(count);
+      const isJustPlaced = justPlaced && justPlaced[0] === r && justPlaced[1] === c;
 
       frogsDiv.innerHTML = '';
       for (let i = 0; i < count; i++) {
-        const frog = document.createElement('img');
-        frog.src = FROG_SPRITES[owner];
-        frog.className = `frog p${owner}${isCrit ? ' critical' : ''}`;
-        frog.style.width = sz + 'px';
-        frog.style.height = sz + 'px';
-        frog.draggable = false;
-        frogsDiv.appendChild(frog);
+        const wrap = document.createElement('div');
+        wrap.className = `frog-wrap p${owner}${isCrit ? ' critical' : ''}`;
+        // Last frog in a just-placed cell gets the place animation
+        if (isJustPlaced && i === count - 1) {
+          wrap.classList.add('placed');
+          wrap.addEventListener('animationend', () => wrap.classList.remove('placed'), { once: true });
+        }
+        wrap.style.width = sz + 'px';
+        wrap.style.height = sz + 'px';
+
+        const sit = document.createElement('img');
+        sit.src = FROG_SPRITES[owner];
+        sit.className = 'sit';
+        sit.draggable = false;
+
+        const jump = document.createElement('img');
+        jump.src = FROG_JUMP[owner];
+        jump.className = 'jump';
+        jump.draggable = false;
+
+        wrap.appendChild(sit);
+        wrap.appendChild(jump);
+        frogsDiv.appendChild(wrap);
+
+        // Stagger critical animation for multiple frogs
+        if (isCrit) wrap.style.animationDelay = (i * 0.15) + 's';
       }
     }
   }
+  justPlaced = null;
   $('count-p1').textContent = countOrbs(board, 1);
   $('count-p2').textContent = countOrbs(board, 2);
   $('hud-p1').classList.toggle('active', currentPlayer === 1 && !gameOver);
@@ -460,6 +499,7 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function animatedPlace(r, c, player) {
   board[r][c].count++;
   board[r][c].owner = player;
+  justPlaced = [r, c];
   renderBoard();
   sndPlace();
 
