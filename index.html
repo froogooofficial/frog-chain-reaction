@@ -31,6 +31,9 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
 .btn-play{background:#166534;color:#4ade80;border:3px solid #4ade80;padding:0.8rem 2rem;font-size:0.8rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;transition:transform .2s;text-shadow:1px 1px 0 #052e16}
 .btn-play:active{transform:scale(.96)}
 .btn-play:hover{background:#4ade80;color:#052e16}
+.diff-select{display:flex;gap:0.5rem;justify-content:center;margin-bottom:1.2rem}
+.diff-btn{background:rgba(5,46,22,0.6);border:2px solid #166534;color:#86efac;padding:0.5rem 1rem;font-size:0.5rem;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;transition:all .2s}
+.diff-btn.active{background:#166534;border-color:#4ade80;color:#4ade80;box-shadow:0 0 12px rgba(74,222,128,0.3)}
 
 /* GAME */
 #game-screen{display:none;position:relative}
@@ -152,6 +155,10 @@ body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backg
     <b>Corners</b> = 2 · <b>Edges</b> = 3 · <b>Center</b> = 4<br>
     Leaping frogs <b>convert</b> enemy frogs!<br>
     <b>Clear all enemy frogs to win.</b>
+  </div>
+  <div class="diff-select">
+    <button class="diff-btn" data-d="easy" onclick="setDiff('easy')">🌱 Easy</button>
+    <button class="diff-btn active" data-d="hard" onclick="setDiff('hard')">🧠 Hard</button>
   </div>
   <button class="btn-play" onclick="startGame()">START 🐸</button>
   <p style="margin-top:1.5rem;font-size:0.4rem;color:#2d5a3d">Created by Dan Shamir & Arlo 🤖</p>
@@ -344,43 +351,128 @@ function simulate(b, r, c, player) {
 }
 
 // ===== AI =====
-function aiMove() {
-  const valid = [];
+let aiDifficulty = 'hard'; // 'easy', 'hard'
+
+function setDiff(d) {
+  aiDifficulty = d;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('active', b.dataset.d === d));
+}
+
+function evaluate(b, aiPlayer, humanPlayer, moveNum) {
+  const aiOrbs = countOrbs(b, aiPlayer);
+  const huOrbs = countOrbs(b, humanPlayer);
+  // Instant win/loss
+  if (moveNum >= 2 && huOrbs === 0) return 10000;
+  if (moveNum >= 2 && aiOrbs === 0) return -10000;
+
+  let aiCells = 0, huCells = 0, aiPressure = 0, huPressure = 0;
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++) {
+      const cell = b[r][c];
+      if (cell.owner === aiPlayer) {
+        aiCells++;
+        const cm = critMass(r, c);
+        // Pressure = how close to exploding (corners worth more)
+        if (cell.count === cm - 1) aiPressure += (cm === 2 ? 6 : cm === 3 ? 3 : 2);
+      } else if (cell.owner === humanPlayer) {
+        huCells++;
+        const cm = critMass(r, c);
+        if (cell.count === cm - 1) huPressure += (cm === 2 ? 6 : cm === 3 ? 3 : 2);
+      }
+    }
+  
+  let score = 0;
+  score += (aiOrbs - huOrbs) * 2;       // Orb advantage
+  score += (aiCells - huCells) * 4;       // Territory control
+  score += (aiPressure - huPressure) * 1; // Pressure advantage
+  return score;
+}
+
+function getValidMoves(b, player) {
+  const moves = [];
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++)
-      if (board[r][c].owner === 0 || board[r][c].owner === 2) valid.push([r, c]);
+      if (b[r][c].owner === 0 || b[r][c].owner === player) moves.push([r, c]);
+  return moves;
+}
+
+function minimax(b, depth, alpha, beta, isMaximizing, aiPlayer, humanPlayer, moveNum) {
+  // Terminal check
+  const aiOrbs = countOrbs(b, aiPlayer);
+  const huOrbs = countOrbs(b, humanPlayer);
+  if (moveNum >= 2 && huOrbs === 0) return 10000 + depth; // Win sooner = better
+  if (moveNum >= 2 && aiOrbs === 0) return -10000 - depth;
+  if (depth === 0) return evaluate(b, aiPlayer, humanPlayer, moveNum);
+
+  const player = isMaximizing ? aiPlayer : humanPlayer;
+  const moves = getValidMoves(b, player);
+  if (moves.length === 0) return evaluate(b, aiPlayer, humanPlayer, moveNum);
+
+  if (isMaximizing) {
+    let best = -Infinity;
+    for (const [r, c] of moves) {
+      const sim = deepCopy(b);
+      simulate(sim, r, c, player);
+      const val = minimax(sim, depth - 1, alpha, beta, false, aiPlayer, humanPlayer, moveNum + 1);
+      best = Math.max(best, val);
+      alpha = Math.max(alpha, val);
+      if (beta <= alpha) break; // Prune
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const [r, c] of moves) {
+      const sim = deepCopy(b);
+      simulate(sim, r, c, player);
+      const val = minimax(sim, depth - 1, alpha, beta, true, aiPlayer, humanPlayer, moveNum + 1);
+      best = Math.min(best, val);
+      beta = Math.min(beta, val);
+      if (beta <= alpha) break; // Prune
+    }
+    return best;
+  }
+}
+
+function aiMove() {
+  const valid = getValidMoves(board, 2);
+  if (valid.length === 0) return valid[0];
+
+  // Easy: random with slight preference for corners
+  if (aiDifficulty === 'easy') {
+    // 30% chance of a smart move, 70% random
+    if (Math.random() < 0.7) {
+      return valid[Math.floor(Math.random() * valid.length)];
+    }
+  }
+
+  // Medium: 1-ply (current greedy approach)
+  // Hard: 2-ply minimax with alpha-beta
+  const depth = aiDifficulty === 'hard' ? 2 : 1;
 
   let bestScore = -Infinity, bestMoves = [];
   for (const [r, c] of valid) {
     const sim = deepCopy(board);
     const result = simulate(sim, r, c, 2);
-    let score = 0;
-    const myOrbs = countOrbs(result.board, 2);
-    const theirOrbs = countOrbs(result.board, 1);
-    if (totalMoves >= 1 && theirOrbs === 0) return [r, c];
-    score += myOrbs * 2 - theirOrbs * 2;
-    let myCells = 0, theirCells = 0;
-    for (let rr = 0; rr < ROWS; rr++)
-      for (let cc = 0; cc < COLS; cc++) {
-        if (result.board[rr][cc].owner === 2) myCells++;
-        if (result.board[rr][cc].owner === 1) theirCells++;
-      }
-    score += (myCells - theirCells) * 3;
-    score += result.captured * 5;
-    const cm = critMass(r, c);
-    if (cm === 2) score += 4;
-    else if (cm === 3) score += 1;
-    if (result.chainLen === 0) {
-      for (const [nr, nc] of neighbors(r, c)) {
-        if (board[nr][nc].owner === 1 && board[nr][nc].count === critMass(nr, nc) - 1) score -= 12;
-      }
+
+    let score;
+    if (aiDifficulty === 'hard') {
+      // Check instant win
+      if (totalMoves >= 1 && countOrbs(sim, 1) === 0) return [r, c];
+      score = minimax(sim, depth - 1, -Infinity, Infinity, false, 2, 1, totalMoves + 2);
+    } else {
+      // Medium / Easy fallback: greedy eval
+      if (totalMoves >= 1 && countOrbs(result.board, 1) === 0) return [r, c];
+      score = evaluate(result.board, 2, 1, totalMoves + 1);
+      score += result.captured * 5;
+      score += result.chainLen * 2;
     }
-    if (board[r][c].owner === 2 && board[r][c].count === critMass(r, c) - 1) {
-      score += result.captured > 0 ? 10 : -3;
-    }
+
     if (score > bestScore) { bestScore = score; bestMoves = [[r, c]]; }
     else if (score === bestScore) bestMoves.push([r, c]);
   }
+
+  // Hard: pick best deterministically (no random among ties for corners)
+  // Actually, small random among ties is fine for variety
   return bestMoves[Math.floor(Math.random() * bestMoves.length)];
 }
 
@@ -693,7 +785,7 @@ function updateTurnBanner() {
     banner.textContent = 'Your turn — tap a lily pad';
     banner.className = 'turn-banner';
   } else {
-    banner.textContent = 'AI is thinking...';
+    banner.textContent = aiDifficulty === 'hard' ? 'AI is thinking hard... 🧠' : 'AI is thinking...';
     banner.className = 'turn-banner thinking';
   }
 }
@@ -711,7 +803,7 @@ async function onCellClick(r, c) {
 
   currentPlayer = 2;
   updateTurnBanner();
-  await delay(400 + Math.random() * 300);
+  await delay(aiDifficulty === 'hard' ? 500 + Math.random() * 400 : 300 + Math.random() * 200);
   if (gameOver) return;
 
   const [ar, ac] = aiMove();
@@ -756,8 +848,9 @@ function endGame(winner) {
 // ===== SHARING =====
 function getShareText() {
   const won = stats.winStreak > 0;
+  const diff = aiDifficulty === 'hard' ? '🧠 Hard' : '🌱 Easy';
   return [
-    won ? `🏆🐸 I beat the AI in Frog Pond in ${stats.moves} moves!` : `💀🐸 The AI crushed me in Frog Pond after ${stats.moves} moves!`,
+    won ? `🏆🐸 I beat the ${diff} AI in Frog Pond in ${stats.moves} moves!` : `💀🐸 The ${diff} AI crushed me in Frog Pond after ${stats.moves} moves!`,
     '', `📊 My score:`, `💦 Longest chain: ${stats.bestChain}x`, `🐸 Frogs captured: ${stats.captured}`,
     stats.winStreak > 1 ? `🔥 Win streak: ${stats.winStreak}` : '',
     '', won ? `Think you can beat my ${stats.moves}-move win? 👀` : `Can you beat it? 🤔`,
